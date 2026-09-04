@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>going on a quest</title>
+  <style>
+    body { font-family: monospace; max-width: 600px; margin: 20px auto; padding: 15px; background: #0f0f12; color: #e1e1e6; }
+    h1 { color: #00f0ff; text-transform: lowercase; margin: 0; }
+    .card { background: #181820; padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #282836; }
+    .reply-card { margin-left: 20px; border-left: 2px solid #00f0ff; margin-top: 8px; }
+    input, textarea, button { width: 100%; margin-top: 6px; padding: 8px; background: #22222e; color: #fff; border: 1px solid #333348; border-radius: 4px; box-sizing: border-box; }
+    button { background: #00f0ff; color: #000; font-weight: bold; cursor: pointer; border: none; }
+    .btn-secondary { background: #22222e; color: #00f0ff; border: 1px solid #00f0ff; }
+    .username { font-weight: bold; color: #00f0ff; text-decoration: none; }
+    .username:hover { text-decoration: underline; }
+    .meta { font-size: 0.8em; color: #777; }
+    .actions { display: flex; gap: 8px; margin-top: 8px; }
+    .actions button { width: auto; font-size: 0.8em; padding: 4px 8px; }
+    .nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .nav a { color: #00f0ff; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+  <div class="nav">
+    <h1>going on a quest</h1>
+    <div>
+      <a id="my-profile-link" href="#">my profile</a> | 
+      <a href="#" onclick="logout()">logout</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <textarea id="post-content" rows="3" placeholder="what is your quest?"></textarea>
+    <button onclick="submitPost()">embark (post)</button>
+  </div>
+
+  <h2>the trail (feed)</h2>
+  <div id="feed">loading...</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <script>
+    const user = requireAuth();
+    document.getElementById('my-profile-link').href = `${BASE_PATH}/users/${user.username}`;
+
+    async function submitPost(parentId = null) {
+      const inputId = parentId ? `reply-input-${parentId}` : 'post-content';
+      const content = document.getElementById(inputId).value.trim();
+      if (!content) return;
+
+      const { error } = await supabase.from('posts').insert([{
+        account_id: user.id,
+        content: content,
+        parent_id: parentId
+      }]);
+
+      if (!error) {
+        document.getElementById(inputId).value = '';
+        loadFeed();
+      }
+    }
+
+    async function likePost(id, currentLikes) {
+      await supabase.from('posts').update({ likes_count: currentLikes + 1 }).eq('id', id);
+      loadFeed();
+    }
+
+    async function loadFeed() {
+      const { data: posts, error } = await supabase
+        .from('posts')
+        .select('*, accounts(username, display_name)')
+        .order('created_at', { ascending: false });
+
+      if (error) return;
+
+      const feed = document.getElementById('feed');
+      feed.innerHTML = '';
+
+      const topPosts = posts.filter(p => !p.parent_id);
+      const replies = posts.filter(p => p.parent_id);
+
+      topPosts.forEach(post => {
+        feed.appendChild(renderPostCard(post, replies));
+      });
+    }
+
+    function renderPostCard(post, allReplies) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      const childReplies = allReplies.filter(r => r.parent_id === post.id);
+
+      const username = post.accounts?.username || 'unknown';
+      const displayName = post.accounts?.display_name || 'anon';
+
+      card.innerHTML = `
+        <div>
+          <a class="username" href="${BASE_PATH}/users/${username}">${escapeHtml(displayName)}</a> 
+          <span class="meta">@${escapeHtml(username)}</span>
+        </div>
+        <p>${escapeHtml(post.content)}</p>
+        <div class="actions">
+          <button onclick="likePost('${post.id}', ${post.likes_count})">⚔️ ${post.likes_count}</button>
+          <button onclick="toggleReplyBox('${post.id}')" class="btn-secondary">reply</button>
+        </div>
+        <div id="reply-box-${post.id}" style="display:none; margin-top:8px;">
+          <input type="text" id="reply-input-${post.id}" placeholder="write a reply..." />
+          <button onclick="submitPost('${post.id}')">send reply</button>
+        </div>
+        <div id="replies-${post.id}"></div>
+      `;
+
+      const replyContainer = card.querySelector(`#replies-${post.id}`);
+      childReplies.forEach(reply => {
+        const replyEl = renderPostCard(reply, allReplies);
+        replyEl.classList.add('reply-card');
+        replyContainer.appendChild(replyEl);
+      });
+
+      return card;
+    }
+
+    function toggleReplyBox(id) {
+      const el = document.getElementById(`reply-box-${id}`);
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    supabase.channel('public:posts').on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, loadFeed).subscribe();
+    loadFeed();
+  </script>
+</body>
+</html>
+
