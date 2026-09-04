@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>going on a quest - login</title>
+  <style>
+    body { font-family: monospace; max-width: 400px; margin: 40px auto; padding: 15px; background: #0f0f12; color: #e1e1e6; }
+    h1 { color: #00f0ff; text-transform: lowercase; text-align: center; }
+    .card { background: #181820; padding: 16px; border-radius: 8px; border: 1px solid #282836; }
+    input, button { width: 100%; margin-top: 8px; padding: 10px; background: #22222e; color: #fff; border: 1px solid #333348; border-radius: 4px; box-sizing: border-box; }
+    button { background: #00f0ff; color: #000; font-weight: bold; cursor: pointer; border: none; }
+    .btn-secondary { background: #22222e; color: #00f0ff; border: 1px solid #00f0ff; }
+  </style>
+</head>
+<body>
+
+  <h1>going on a quest</h1>
+
+  <div class="card">
+    <h3>login or embark</h3>
+    <input type="text" id="acc-identifier" placeholder="handle or email" />
+    <input type="text" id="acc-display" placeholder="display name (registration only)" />
+    <input type="password" id="acc-password" placeholder="password" />
+    
+    <button onclick="loginAccount()" style="margin-top: 12px;">login</button>
+    <button onclick="createAccount()" class="btn-secondary">register (embark)</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../auth.js"></script>
+  <script>
+    if (getCurrentUser()) {
+      window.location.href = `${BASE_PATH}/`;
+    }
+
+    async function loginAccount() {
+      const rawIdentifier = document.getElementById('acc-identifier').value.trim();
+      const password = document.getElementById('acc-password').value;
+
+      if (!rawIdentifier || !password) return alert('enter handle/email and password');
+
+      const cleanHandle = rawIdentifier.replace(/^@/, '');
+
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('*')
+        .or(`username.eq.${cleanHandle},email.eq.${rawIdentifier}`)
+        .eq('password', password)
+        .maybeSingle();
+
+      if (error || !data) {
+        alert('invalid credentials!');
+      } else {
+        localStorage.setItem('quest_account', JSON.stringify(data));
+        window.location.href = `${BASE_PATH}/`;
+      }
+    }
+
+    async function createAccount() {
+      const rawIdentifier = document.getElementById('acc-identifier').value.trim();
+      const display_name = document.getElementById('acc-display').value.trim();
+      const password = document.getElementById('acc-password').value;
+
+      if (!rawIdentifier || !display_name || !password) return alert('fill in all fields to register');
+
+      const isEmail = rawIdentifier.includes('@') && rawIdentifier.includes('.');
+      const cleanHandle = rawIdentifier.replace(/^@/, '');
+
+      const accountData = { username: cleanHandle, display_name, password };
+      if (isEmail) accountData.email = rawIdentifier;
+
+      const { data, error } = await supabase
+        .from('accounts')
+        .insert([accountData])
+        .select()
+        .single();
+
+      if (error) {
+        alert('registration failed: ' + error.message);
+      } else {
+        localStorage.setItem('quest_account', JSON.stringify(data));
+        window.location.href = `${BASE_PATH}/`;
+      }
+    }
+  </script>
+</body>
+</html>
+
