@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>going on a quest - profile</title>
+  <style>
+    body { font-family: monospace; max-width: 600px; margin: 20px auto; padding: 15px; background: #0f0f12; color: #e1e1e6; }
+    h1, h2 { color: #00f0ff; text-transform: lowercase; }
+    .card { background: #181820; padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #282836; }
+    .nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .nav a { color: #00f0ff; text-decoration: none; }
+    .meta { font-size: 0.8em; color: #777; }
+  </style>
+</head>
+<body>
+
+  <div class="nav">
+    <a id="back-link" href="#">← back to feed</a>
+    <a href="#" onclick="logout()">logout</a>
+  </div>
+
+  <div id="profile-header" class="card">
+    <h2 id="disp-name">loading profile...</h2>
+    <p id="handle-name" class="meta"></p>
+  </div>
+
+  <h3>quests embarked on</h3>
+  <div id="user-posts">loading posts...</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../auth.js"></script>
+  <script>
+    requireAuth();
+    document.getElementById('back-link').href = `${BASE_PATH}/`;
+
+    // Extract handle from pathname (/users/username or /users/username/)
+    const pathParts = window.location.pathname.replace(/\/$/, '').split('/');
+    const targetUsername = pathParts[pathParts.length - 1] === 'users' 
+      ? new URLSearchParams(window.location.search).get('u')
+      : pathParts[pathParts.length - 1];
+
+    async function loadProfile() {
+      if (!targetUsername) {
+        document.getElementById('disp-name').innerText = 'User not specified';
+        return;
+      }
+
+      // Query target account
+      const { data: profile, error } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('username', targetUsername)
+        .maybeSingle();
+
+      if (error || !profile) {
+        document.getElementById('disp-name').innerText = 'User not found';
+        return;
+      }
+
+      document.getElementById('disp-name').innerText = profile.display_name;
+      document.getElementById('handle-name').innerText = `@${profile.username}`;
+
+      // Query posts created by this account
+      const { data: posts, error: postErr } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('account_id', profile.id)
+        .order('created_at', { ascending: false });
+
+      const postsDiv = document.getElementById('user-posts');
+      postsDiv.innerHTML = '';
+
+      if (!posts || posts.length === 0) {
+        postsDiv.innerHTML = '<p class="meta">no posts on the trail yet.</p>';
+        return;
+      }
+
+      posts.forEach(post => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <p>${escapeHtml(post.content)}</p>
+          <span class="meta">⚔️ ${post.likes_count} likes</span>
+        `;
+        postsDiv.appendChild(card);
+      });
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>
+
