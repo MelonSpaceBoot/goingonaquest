@@ -23,7 +23,6 @@
 </head>
 <body>
 
-  <!-- Hidden by default until JS confirms session -->
   <div class="nav" id="main-nav" style="display: none;">
     <h1>going on a quest</h1>
     <div>
@@ -42,16 +41,31 @@
     <div id="feed">loading...</div>
   </div>
 
+  <div id="redirecting-msg" style="text-align: center; margin-top: 40px; color: #777;">
+    checking session...
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth.js"></script>
   <script>
     let user = null;
 
-    document.addEventListener('DOMContentLoaded', () => {
-      user = requireAuth();
-      if (!user) return; // Immediate redirect to /login/ happens inside requireAuth()
+    window.addEventListener('load', () => {
+      // Re-initialize supabase if missing on DOMReady
+      if (!supabase && window.supabase) {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      }
 
-      // Show UI elements once authenticated
+      user = getCurrentUser();
+
+      if (!user) {
+        document.getElementById('redirecting-msg').innerText = 'Redirecting to login...';
+        window.location.href = `${BASE_PATH}/login/`;
+        return;
+      }
+
+      // Hide loading message & render application
+      document.getElementById('redirecting-msg').style.display = 'none';
       document.getElementById('main-nav').style.display = 'flex';
       document.getElementById('main-content').style.display = 'block';
 
