@@ -23,7 +23,8 @@
 </head>
 <body>
 
-  <div class="nav">
+  <!-- Hidden by default until JS confirms session -->
+  <div class="nav" id="main-nav" style="display: none;">
     <h1>going on a quest</h1>
     <div>
       <a id="my-profile-link" href="#">my profile</a> | 
@@ -31,13 +32,15 @@
     </div>
   </div>
 
-  <div class="card">
-    <textarea id="post-content" rows="3" placeholder="what is your quest?"></textarea>
-    <button onclick="submitPost()">embark (post)</button>
-  </div>
+  <div id="main-content" style="display: none;">
+    <div class="card">
+      <textarea id="post-content" rows="3" placeholder="what is your quest?"></textarea>
+      <button onclick="submitPost()">embark (post)</button>
+    </div>
 
-  <h2>the trail (feed)</h2>
-  <div id="feed">loading...</div>
+    <h2>the trail (feed)</h2>
+    <div id="feed">loading...</div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth.js"></script>
@@ -46,7 +49,11 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       user = requireAuth();
-      if (!user) return;
+      if (!user) return; // Immediate redirect to /login/ happens inside requireAuth()
+
+      // Show UI elements once authenticated
+      document.getElementById('main-nav').style.display = 'flex';
+      document.getElementById('main-content').style.display = 'block';
 
       const profileLink = document.getElementById('my-profile-link');
       if (profileLink) {
@@ -157,3 +164,4 @@
   </script>
 </body>
 </html>
+
