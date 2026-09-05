@@ -42,10 +42,28 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth.js"></script>
   <script>
-    const user = requireAuth();
-    document.getElementById('my-profile-link').href = `${BASE_PATH}/users/${user.username}`;
+    let user = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      user = requireAuth();
+      if (!user) return;
+
+      const profileLink = document.getElementById('my-profile-link');
+      if (profileLink) {
+        profileLink.href = `${BASE_PATH}/users/${user.username}`;
+      }
+
+      if (supabase) {
+        supabase.channel('public:posts')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, loadFeed)
+          .subscribe();
+      }
+
+      loadFeed();
+    });
 
     async function submitPost(parentId = null) {
+      if (!user) return alert('You must be logged in');
       const inputId = parentId ? `reply-input-${parentId}` : 'post-content';
       const content = document.getElementById(inputId).value.trim();
       if (!content) return;
@@ -56,7 +74,9 @@
         parent_id: parentId
       }]);
 
-      if (!error) {
+      if (error) {
+        alert('Error posting: ' + error.message);
+      } else {
         document.getElementById(inputId).value = '';
         loadFeed();
       }
@@ -68,18 +88,27 @@
     }
 
     async function loadFeed() {
+      if (!supabase) return;
       const { data: posts, error } = await supabase
         .from('posts')
         .select('*, accounts(username, display_name)')
         .order('created_at', { ascending: false });
 
-      if (error) return;
+      if (error) {
+        console.error(error);
+        return;
+      }
 
       const feed = document.getElementById('feed');
       feed.innerHTML = '';
 
       const topPosts = posts.filter(p => !p.parent_id);
       const replies = posts.filter(p => p.parent_id);
+
+      if (topPosts.length === 0) {
+        feed.innerHTML = '<p class="meta">no posts on the trail yet. be the first!</p>';
+        return;
+      }
 
       topPosts.forEach(post => {
         feed.appendChild(renderPostCard(post, replies));
@@ -125,10 +154,6 @@
       const el = document.getElementById(`reply-box-${id}`);
       el.style.display = el.style.display === 'none' ? 'block' : 'none';
     }
-
-    supabase.channel('public:posts').on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, loadFeed).subscribe();
-    loadFeed();
   </script>
 </body>
 </html>
-
