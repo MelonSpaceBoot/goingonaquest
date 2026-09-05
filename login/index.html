@@ -28,62 +28,63 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../auth.js"></script>
-  <script>
-    if (getCurrentUser()) {
-      window.location.href = `${BASE_PATH}/`;
+<script src="../auth.js"></script>
+<script>
+  // If user is actually logged in, push to root feed
+  if (getCurrentUser()) {
+    window.location.href = `${BASE_PATH}/` || '/';
+  }
+
+  async function loginAccount() {
+    const rawIdentifier = document.getElementById('acc-identifier').value.trim();
+    const password = document.getElementById('acc-password').value;
+
+    if (!rawIdentifier || !password) return alert('Enter handle/email and password');
+
+    const cleanHandle = rawIdentifier.replace(/^@/, '');
+
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .or(`username.eq.${cleanHandle},email.eq.${rawIdentifier}`)
+      .eq('password', password)
+      .maybeSingle();
+
+    if (error || !data) {
+      alert('Invalid credentials!');
+    } else {
+      localStorage.setItem('quest_account', JSON.stringify(data));
+      window.location.href = `${BASE_PATH}/` || '/';
     }
+  }
 
-    async function loginAccount() {
-      const rawIdentifier = document.getElementById('acc-identifier').value.trim();
-      const password = document.getElementById('acc-password').value;
+  async function createAccount() {
+    const rawIdentifier = document.getElementById('acc-identifier').value.trim();
+    const display_name = document.getElementById('acc-display').value.trim();
+    const password = document.getElementById('acc-password').value;
 
-      if (!rawIdentifier || !password) return alert('enter handle/email and password');
+    if (!rawIdentifier || !display_name || !password) return alert('Fill in all fields to register');
 
-      const cleanHandle = rawIdentifier.replace(/^@/, '');
+    const isEmail = rawIdentifier.includes('@') && rawIdentifier.includes('.');
+    const cleanHandle = rawIdentifier.replace(/^@/, '');
 
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('*')
-        .or(`username.eq.${cleanHandle},email.eq.${rawIdentifier}`)
-        .eq('password', password)
-        .maybeSingle();
+    const accountData = { username: cleanHandle, display_name, password };
+    if (isEmail) accountData.email = rawIdentifier;
 
-      if (error || !data) {
-        alert('invalid credentials!');
-      } else {
-        localStorage.setItem('quest_account', JSON.stringify(data));
-        window.location.href = `${BASE_PATH}/`;
-      }
+    const { data, error } = await supabase
+      .from('accounts')
+      .insert([accountData])
+      .select()
+      .single();
+
+    if (error) {
+      alert('Registration failed: ' + error.message);
+    } else {
+      localStorage.setItem('quest_account', JSON.stringify(data));
+      window.location.href = `${BASE_PATH}/` || '/';
     }
-
-    async function createAccount() {
-      const rawIdentifier = document.getElementById('acc-identifier').value.trim();
-      const display_name = document.getElementById('acc-display').value.trim();
-      const password = document.getElementById('acc-password').value;
-
-      if (!rawIdentifier || !display_name || !password) return alert('fill in all fields to register');
-
-      const isEmail = rawIdentifier.includes('@') && rawIdentifier.includes('.');
-      const cleanHandle = rawIdentifier.replace(/^@/, '');
-
-      const accountData = { username: cleanHandle, display_name, password };
-      if (isEmail) accountData.email = rawIdentifier;
-
-      const { data, error } = await supabase
-        .from('accounts')
-        .insert([accountData])
-        .select()
-        .single();
-
-      if (error) {
-        alert('registration failed: ' + error.message);
-      } else {
-        localStorage.setItem('quest_account', JSON.stringify(data));
-        window.location.href = `${BASE_PATH}/`;
-      }
-    }
-  </script>
+  }
+</script>
 </body>
 </html>
 
